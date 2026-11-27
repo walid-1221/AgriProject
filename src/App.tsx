@@ -60,6 +60,9 @@ import { BangladeshAgriDataSection } from "./components/BangladeshAgriDataSectio
 import { UnifiedLoginModal } from "./components/UnifiedLoginModal";
 import { OpeningLandingPage } from "./components/OpeningLandingPage";
 import { HarvestNotificationCenter } from "./components/HarvestNotificationCenter";
+import { FarmerYieldHistoryChart } from "./components/FarmerYieldHistoryChart";
+import { NationalAgriIntelligence } from "./components/NationalAgriIntelligence";
+import { SixMonthForecastItem } from "./data/agriIntelligenceData";
 import {
   BrowserNotificationPermission,
   getBrowserNotificationPermission,
@@ -83,7 +86,7 @@ export default function App() {
     return (saved as ThemeMode) || "LIGHT";
   });
 
-  const [activeMainTab, setActiveMainTab] = useState<"HOME" | "AGRI_DATA" | "DASHBOARD" | "STORE" | "COMMUNITY" | "ABOUT_US">("HOME");
+  const [activeMainTab, setActiveMainTab] = useState<"HOME" | "AGRI_DATA" | "DEMAND_FORECAST" | "DASHBOARD" | "STORE" | "COMMUNITY" | "ABOUT_US">("HOME");
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginModalDefaultRole, setLoginModalDefaultRole] = useState<"PRODUCER" | "BUYER" | "OFFICER" | "AGENT">("PRODUCER");
 
@@ -1455,6 +1458,19 @@ export default function App() {
               </button>
 
               <button
+                id="nav-demand-forecast-tab"
+                onClick={() => setActiveMainTab("DEMAND_FORECAST")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "DEMAND_FORECAST"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <TrendingUp className="w-4 h-4 text-amber-500" />
+                <span>{getTranslation(lang, 'navDemandForecast')}</span>
+              </button>
+
+              <button
                 id="nav-dashboard-tab"
                 onClick={() => setActiveMainTab("DASHBOARD")}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
@@ -1601,6 +1617,50 @@ export default function App() {
             onOpenLoginModal={handleOpenLoginModal}
           />
         )}
+
+        {/* VIEW 0B: NATIONAL AGRICULTURAL INTELLIGENCE & 6-MONTH DEMAND FORECAST */}
+        {activeMainTab === "DEMAND_FORECAST" && (
+          <NationalAgriIntelligence
+            lang={lang}
+            theme={theme}
+            onListProduceFromForecast={(item: SixMonthForecastItem) => {
+              const cropLabel = lang === "BN" ? item.defaultListingCropBn : item.defaultListingCropEn;
+              setNewCropName(cropLabel);
+              if (activeUser.role !== "FARMER") {
+                const defaultFarmer = users.find((u) => u.role === "FARMER") || initialUsers[0];
+                setActiveUser(defaultFarmer);
+              }
+              setActiveMainTab("DASHBOARD");
+              triggerNotificationToast(
+                lang === "BN"
+                  ? `🌾 '${cropLabel}' ফসল তালিকাভুক্ত করতে ফর্ম প্রস্তুত করা হয়েছে!`
+                  : `🌾 Listing form pre-filled for '${cropLabel}'!`
+              );
+              window.setTimeout(() => {
+                document.getElementById("add-listing-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 100);
+            }}
+            onPreBookSupplyFromForecast={(item: SixMonthForecastItem) => {
+              const cropLabel = lang === "BN" ? item.defaultListingCropBn : item.defaultListingCropEn;
+              if (activeUser.role === "BUYER") {
+                setSearchText(item.defaultListingCropEn.split(" ")[0]);
+                setActiveMainTab("DASHBOARD");
+                triggerNotificationToast(
+                  lang === "BN"
+                    ? `🛡️ '${cropLabel}' বি-টু-বি এসক্রো বাজারে ফিল্টার করা হয়েছে!`
+                    : `🛡️ Filtered B2B Escrow Exchange for '${cropLabel}' supply!`
+                );
+              } else {
+                setActiveMainTab("STORE");
+                triggerNotificationToast(
+                  lang === "BN"
+                    ? `🛒 '${cropLabel}' প্রি-বুক ও সরবরাহ দেখতে ই-কমার্স স্টোরে যাওয়া হচ্ছে!`
+                    : `🛒 Opening verified marketplace & pre-booking for '${cropLabel}'!`
+                );
+              }
+            }}
+          />
+        )}
         
         {/* VIEW 1: PUBLIC E-COMMERCE STORE */}
         {activeMainTab === "STORE" && (
@@ -1642,7 +1702,7 @@ export default function App() {
           <div id="farmer-workspace" className="space-y-8 font-sans">
 
             {/* -- Farmer Portfolio Profile Header -- */}
-            <div className="bg-white rounded-3xl border-2 border-[#1A2A1A]/5 p-6 md:p-8 relative overflow-hidden shadow-sm animate-fade-in-up">
+            <div className="bg-white rounded-3xl border-2 border-[#1A2A1A]/5 p-6 md:p-8 space-y-6 relative overflow-hidden shadow-sm animate-fade-in-up">
               <div className="absolute top-0 right-0 w-80 h-80 bg-[#2D4F1E]/5 rounded-full blur-3xl -z-10" />
               <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-[#F97316]/5 rounded-full blur-3xl -z-10" />
               
@@ -1728,6 +1788,14 @@ export default function App() {
                 )}
 
               </div>
+
+              {/* -- 12-Month Historical Crop Yield Success Chart (Recharts) -- */}
+              <FarmerYieldHistoryChart
+                farmerId={activeUser.user_id}
+                farmerName={activeUser.name}
+                farmerProfile={getFarmerProfile(activeUser.user_id)}
+                lang={lang}
+              />
             </div>
 
             {/* -- 3-DAY PRE-HARVEST LOCAL NOTIFICATION CENTER -- */}

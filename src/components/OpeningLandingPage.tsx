@@ -39,7 +39,7 @@ interface OpeningLandingPageProps {
   theme?: ThemeMode;
   users: User[];
   onSelectUser: (user: User) => void;
-  onNavigateTab: (tab: "AGRI_DATA" | "STORE" | "COMMUNITY" | "ABOUT_US" | "DASHBOARD") => void;
+  onNavigateTab: (tab: "AGRI_DATA" | "DEMAND_FORECAST" | "STORE" | "COMMUNITY" | "ABOUT_US" | "DASHBOARD") => void;
   onOpenLoginModal: (role?: string) => void;
   onToggleLang?: () => void;
   onToggleTheme?: () => void;
@@ -342,6 +342,14 @@ export const OpeningLandingPage: React.FC<OpeningLandingPageProps> = ({
             >
               <BarChart3 className="w-4 h-4 text-emerald-300" />
               <span>{isBn ? "🇧🇩 বাংলাদেশ কৃষি তথ্য ও পরিসংখ্যান" : "🇧🇩 Explore BD Agri Statistics"}</span>
+            </button>
+
+            <button
+              onClick={() => onNavigateTab("DEMAND_FORECAST")}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black bg-emerald-900/80 hover:bg-emerald-800 text-emerald-100 shadow-lg shadow-emerald-950/50 cursor-pointer transition-all border border-amber-400/40 hover:scale-105"
+            >
+              <TrendingUp className="w-4 h-4 text-amber-300" />
+              <span>{isBn ? "📈 জাতীয় চাহিদা ও ৬ মাসের পূর্বাভাস" : "📈 National Demand & 6M Forecast"}</span>
             </button>
 
             <button
