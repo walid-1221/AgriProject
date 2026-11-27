@@ -163,3 +163,21 @@ export interface StoreOrder {
   status: 'PROCESSING' | 'CONFIRMED' | 'SHIPPED';
 }
 
+export interface LocalNotification {
+  id: string;
+  type: 'HARVEST_REMINDER';
+  farmer_id: number;
+  batch_id: number;
+  crop_name: string;
+  quantity_kg: number;
+  upazila_district: string;
+  estimated_harvest_date: string;
+  days_remaining: number;
+  title: string;
+  message: string;
+  created_at: string;
+  read: boolean;
+  dismissed: boolean;
+}
+
+

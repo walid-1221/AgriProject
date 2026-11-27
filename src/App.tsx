@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sprout,
   Users,
@@ -47,7 +47,7 @@ import {
   CloudRain,
   BarChart3
 } from "lucide-react";
-import { User, FarmerProfile, CropBatch, OfficerProfile, EscrowContract, AgriTicket, LogisticsPool, DoctorAppointment, LanguageMode, ThemeMode, CommunityPost, StoreOrder } from "./types";
+import { User, FarmerProfile, CropBatch, OfficerProfile, EscrowContract, AgriTicket, LogisticsPool, DoctorAppointment, LanguageMode, ThemeMode, CommunityPost, StoreOrder, LocalNotification } from "./types";
 import { initialUsers, initialFarmerProfiles, initialCropBatches, initialOfficerProfiles, initialEscrowContracts, initialAgriTickets, initialLogisticsPools, initialDoctorAppointments, initialCommunityPosts } from "./data/mockData";
 import { cropSamples, CropSample } from "./data/cropSamples";
 import { getTranslation } from "./utils/translations";
@@ -59,6 +59,16 @@ import { RegionalClimateForecast } from "./components/RegionalClimateForecast";
 import { BangladeshAgriDataSection } from "./components/BangladeshAgriDataSection";
 import { UnifiedLoginModal } from "./components/UnifiedLoginModal";
 import { OpeningLandingPage } from "./components/OpeningLandingPage";
+import { HarvestNotificationCenter } from "./components/HarvestNotificationCenter";
+import {
+  BrowserNotificationPermission,
+  getBrowserNotificationPermission,
+  getDaysUntilHarvest,
+  HARVEST_ALERT_LEAD_DAYS,
+  requestBrowserNotificationPermission,
+  sendBrowserNotification,
+  syncHarvestNotifications
+} from "./utils/harvestNotifications";
 import farmerSowingRainImg from "./assets/images/farmer_sowing_rain_1786221231480.jpg";
 
 export default function App() {
@@ -104,7 +114,29 @@ export default function App() {
 
   const [cropBatches, setCropBatches] = useState<CropBatch[]>(() => {
     const saved = localStorage.getItem("sf_crop_batches");
-    return saved ? JSON.parse(saved) : initialCropBatches;
+    if (saved) {
+      try {
+        const parsed: CropBatch[] = JSON.parse(saved);
+        if (!localStorage.getItem("sf_harvest_notif_v1")) {
+          const initialById = new Map(initialCropBatches.map(b => [b.batch_id, b]));
+          const migrated = parsed.map(b => {
+            const seed = initialById.get(b.batch_id);
+            if (seed && /^2026-0[67]-/.test(b.estimated_harvest_date)) {
+              return { ...b, estimated_harvest_date: seed.estimated_harvest_date };
+            }
+            return b;
+          });
+          localStorage.setItem("sf_harvest_notif_v1", "true");
+          localStorage.setItem("sf_crop_batches", JSON.stringify(migrated));
+          return migrated;
+        }
+        return parsed;
+      } catch {
+        return initialCropBatches;
+      }
+    }
+    localStorage.setItem("sf_harvest_notif_v1", "true");
+    return initialCropBatches;
   });
 
   const [officerProfiles, setOfficerProfiles] = useState<Record<number, OfficerProfile>>(() => {
@@ -181,9 +213,33 @@ export default function App() {
   const [docPrescriptionNotes, setDocPrescriptionNotes] = useState("");
   const [activeAppointmentId, setActiveAppointmentId] = useState<number | null>(null);
 
-  // --- In-App Push Notification Toast State ---
+  // --- In-App Push Notification Toast & Local Harvest Alert State ---
   const [showNotificationAlert, setShowNotificationAlert] = useState(false);
   const [notificationAlertMessage, setNotificationAlertMessage] = useState("");
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  const [localNotifications, setLocalNotifications] = useState<LocalNotification[]>(() => {
+    const saved = localStorage.getItem("sf_local_notifications");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+  const localNotificationsRef = useRef<LocalNotification[]>(localNotifications);
+  localNotificationsRef.current = localNotifications;
+
+  const [browserPermission, setBrowserPermission] = useState<BrowserNotificationPermission>(() =>
+    getBrowserNotificationPermission()
+  );
+  const [browserAlertsEnabled, setBrowserAlertsEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem("sf_browser_notif_enabled");
+    return saved === null ? true : saved === "true";
+  });
+  const sessionAlertedIdsRef = useRef<Set<string>>(new Set());
 
   // --- Admin User Manager Form State ---
   const [adminSelectedUserId, setAdminSelectedUserId] = useState<number | null>(null);
@@ -253,7 +309,9 @@ export default function App() {
     localStorage.setItem("sf_agent_active_district", activeDistrict);
     localStorage.setItem("sf_system_logs", JSON.stringify(systemLogs));
     localStorage.setItem("sf_active_user", JSON.stringify(activeUser));
-  }, [users, farmerProfiles, cropBatches, officerProfiles, escrowContracts, agriTickets, logisticsPools, doctorAppointments, communityPosts, storeOrders, lang, theme, isLoggedIn, activeDistrict, systemLogs, activeUser]);
+    localStorage.setItem("sf_local_notifications", JSON.stringify(localNotifications));
+    localStorage.setItem("sf_browser_notif_enabled", String(browserAlertsEnabled));
+  }, [users, farmerProfiles, cropBatches, officerProfiles, escrowContracts, agriTickets, logisticsPools, doctorAppointments, communityPosts, storeOrders, lang, theme, isLoggedIn, activeDistrict, systemLogs, activeUser, localNotifications, browserAlertsEnabled]);
 
   // --- E-Commerce Order Handler ---
   const handlePlaceStoreOrder = (newOrder: StoreOrder) => {
@@ -357,6 +415,8 @@ export default function App() {
       setDoctorAppointments(initialDoctorAppointments);
       setCommunityPosts(initialCommunityPosts);
       setStoreOrders([]);
+      setLocalNotifications([]);
+      sessionAlertedIdsRef.current.clear();
       setLang("EN");
       setTheme("LIGHT");
       setIsLoggedIn(false);
@@ -373,7 +433,8 @@ export default function App() {
       setHasScanned(false);
       setCustomFile(null);
       setSelectedSample(cropSamples[0]);
-      alert("Simulation data completely reset successfully!");
+      localStorage.setItem("sf_harvest_notif_v1", "true");
+      triggerNotificationToast("🔄 Simulation data completely reset to factory defaults.");
     }
   };
 
@@ -384,9 +445,145 @@ export default function App() {
   const triggerNotificationToast = (msg: string) => {
     setNotificationAlertMessage(msg);
     setShowNotificationAlert(true);
-    setTimeout(() => {
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
       setShowNotificationAlert(false);
-    }, 4500);
+      toastTimeoutRef.current = null;
+    }, 5000);
+  };
+
+  const evaluateAndNotifyHarvests = (manualCheck = false) => {
+    const prevList = localNotificationsRef.current;
+    const { notifications: nextList, newlyTriggered } = syncHarvestNotifications(
+      cropBatches,
+      prevList,
+      lang
+    );
+
+    const changed =
+      nextList.length !== prevList.length ||
+      nextList.some((item, idx) => {
+        const prev = prevList[idx];
+        return (
+          !prev ||
+          prev.id !== item.id ||
+          prev.days_remaining !== item.days_remaining ||
+          prev.title !== item.title ||
+          prev.message !== item.message ||
+          prev.read !== item.read ||
+          prev.dismissed !== item.dismissed
+        );
+      });
+
+    if (changed) {
+      setLocalNotifications(nextList);
+      localNotificationsRef.current = nextList;
+    }
+
+    if (activeUser.role === "FARMER") {
+      const activeFarmerAlerts = nextList.filter(
+        (n) => n.farmer_id === activeUser.user_id && !n.dismissed && !n.read
+      );
+
+      const toAnnounce = manualCheck
+        ? activeFarmerAlerts
+        : newlyTriggered.filter((n) => n.farmer_id === activeUser.user_id);
+
+      // Also announce unread alerts once per session when switching to a farmer profile
+      const unseenThisSession = toAnnounce.length > 0
+        ? toAnnounce
+        : activeFarmerAlerts.filter((n) => !sessionAlertedIdsRef.current.has(n.id));
+
+      if (unseenThisSession.length > 0) {
+        unseenThisSession.forEach((alertItem) => {
+          sessionAlertedIdsRef.current.add(alertItem.id);
+          if (browserAlertsEnabled) {
+            sendBrowserNotification(alertItem.title, alertItem.message, alertItem.id);
+          }
+        });
+        const first = unseenThisSession[0];
+        const summary =
+          unseenThisSession.length === 1
+            ? `🌾 ${first.title} — ${first.days_remaining === 0 ? (lang === "BN" ? "আজই ফসল তোলা" : "Harvest Today") : lang === "BN" ? `${first.days_remaining} দিন বাকি` : `${first.days_remaining}d until harvest`}`
+            : lang === "BN"
+            ? `🌾 ফসল তোলার ${unseenThisSession.length}টি সতর্কতা সক্রিয় হয়েছে!`
+            : `🌾 ${unseenThisSession.length} AVAILABLE crop batches due for harvest within 3 days!`;
+        triggerNotificationToast(summary);
+      } else if (manualCheck) {
+        triggerNotificationToast(
+          lang === "BN"
+            ? "✓ সব AVAILABLE ব্যাচ পরীক্ষা সম্পন্ন — নতুন ৩-দিনের সতর্কতা নেই।"
+            : "✓ All AVAILABLE batches checked — no unread 3-day harvest alerts."
+        );
+      }
+    }
+  };
+
+  useEffect(() => {
+    evaluateAndNotifyHarvests(false);
+    const intervalId = window.setInterval(() => {
+      evaluateAndNotifyHarvests(false);
+    }, 60000);
+    return () => window.clearInterval(intervalId);
+  }, [cropBatches, lang, activeUser.user_id, activeUser.role, browserAlertsEnabled]);
+
+  const handleEnableBrowserAlerts = async () => {
+    const result = await requestBrowserNotificationPermission();
+    setBrowserPermission(result);
+    if (result === "granted") {
+      setBrowserAlertsEnabled(true);
+      triggerNotificationToast(
+        lang === "BN"
+          ? "🔔 ব্রাউজার লোকাল নোটিফিকেশন চালু হয়েছে!"
+          : "🔔 Browser local notifications enabled!"
+      );
+      const unreadForFarmer = localNotifications.filter(
+        (n) => n.farmer_id === activeUser.user_id && !n.dismissed && !n.read
+      );
+      if (unreadForFarmer.length > 0) {
+        sendBrowserNotification(
+          unreadForFarmer[0].title,
+          unreadForFarmer[0].message,
+          unreadForFarmer[0].id
+        );
+      }
+    } else if (result === "denied") {
+      triggerNotificationToast(
+        lang === "BN"
+          ? "⚠️ ব্রাউজার নোটিফিকেশন অনুমতি ব্লক করা; ইন-অ্যাপ অ্যালার্ট চালু থাকবে।"
+          : "⚠️ Browser notifications blocked; in-app local alerts remain active."
+      );
+    }
+  };
+
+  const handleMarkHarvestAlertRead = (id: string) => {
+    setLocalNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const handleMarkAllHarvestAlertsRead = () => {
+    setLocalNotifications((prev) =>
+      prev.map((n) =>
+        n.farmer_id === activeUser.user_id && !n.dismissed ? { ...n, read: true } : n
+      )
+    );
+  };
+
+  const handleDismissHarvestAlert = (id: string) => {
+    setLocalNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, dismissed: true, read: true } : n))
+    );
+  };
+
+  const handleRestoreDismissedHarvestAlerts = () => {
+    setLocalNotifications((prev) =>
+      prev.map((n) =>
+        n.farmer_id === activeUser.user_id ? { ...n, dismissed: false } : n
+      )
+    );
   };
 
   const handleBookDoctorAppointment = (e: React.FormEvent) => {
@@ -1148,6 +1345,41 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2">
+              {activeUser.role === "FARMER" && (() => {
+                const farmerUnreadCount = localNotifications.filter(
+                  (n) => n.farmer_id === activeUser.user_id && !n.dismissed && !n.read
+                ).length;
+                const farmerActiveCount = localNotifications.filter(
+                  (n) => n.farmer_id === activeUser.user_id && !n.dismissed
+                ).length;
+                return (
+                  <button
+                    id="top-harvest-bell-btn"
+                    type="button"
+                    onClick={() => {
+                      setActiveMainTab("DASHBOARD");
+                      window.setTimeout(() => {
+                        document.getElementById("harvest-notifications-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }, 80);
+                    }}
+                    className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold rounded-xl border transition-all cursor-pointer ${
+                      farmerUnreadCount > 0
+                        ? "bg-amber-400 text-amber-950 border-amber-300 shadow-sm hover:bg-amber-300"
+                        : "bg-white/10 text-white/90 border-white/15 hover:bg-white/20"
+                    }`}
+                    title={lang === "BN" ? "৩-দিনের ফসল কাটার সতর্কতা দেখুন" : "View 3-Day Pre-Harvest Alerts"}
+                  >
+                    <Bell className={`w-3.5 h-3.5 ${farmerUnreadCount > 0 ? "animate-bounce" : ""}`} />
+                    <span>{farmerActiveCount}</span>
+                    {farmerUnreadCount > 0 && (
+                      <span className="px-1.5 py-0.2 bg-red-600 text-white text-[10px] rounded-full">
+                        {farmerUnreadCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+
               <button
                 id="top-unified-login-btn"
                 onClick={() => handleOpenLoginModal()}
@@ -1497,6 +1729,23 @@ export default function App() {
 
               </div>
             </div>
+
+            {/* -- 3-DAY PRE-HARVEST LOCAL NOTIFICATION CENTER -- */}
+            <HarvestNotificationCenter
+              farmerId={activeUser.user_id}
+              lang={lang}
+              notifications={localNotifications}
+              cropBatches={cropBatches}
+              browserPermission={browserPermission}
+              browserAlertsEnabled={browserAlertsEnabled}
+              onEnableBrowserAlerts={handleEnableBrowserAlerts}
+              onToggleBrowserAlerts={() => setBrowserAlertsEnabled((prev) => !prev)}
+              onMarkRead={handleMarkHarvestAlertRead}
+              onMarkAllRead={handleMarkAllHarvestAlertsRead}
+              onDismiss={handleDismissHarvestAlert}
+              onRestoreDismissed={handleRestoreDismissedHarvestAlerts}
+              onRunManualCheck={() => evaluateAndNotifyHarvests(true)}
+            />
 
             {/* -- SEARCH GROUNDED REGIONAL CLIMATE FORECAST & HARVEST WARNINGS -- */}
             <div className="animate-fade-in-up animation-delay-100">
@@ -1867,7 +2116,26 @@ export default function App() {
                         <td className="py-4 font-bold text-[#1A2A1A]">{batch.crop_name}</td>
                         <td className="py-4 text-right font-semibold text-[#1A2A1A]">{batch.quantity_kg.toLocaleString()} kg</td>
                         <td className="py-4 text-right font-medium text-gray-500">{batch.base_price_per_kg.toFixed(2)} BDT</td>
-                        <td className="py-4 font-medium text-gray-400">{batch.estimated_harvest_date}</td>
+                        <td className="py-4 font-medium text-gray-600">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span>{batch.estimated_harvest_date}</span>
+                            {(() => {
+                              if (batch.status !== "AVAILABLE") return null;
+                              const daysLeft = getDaysUntilHarvest(batch.estimated_harvest_date);
+                              if (daysLeft === null || daysLeft < 0 || daysLeft > HARVEST_ALERT_LEAD_DAYS) return null;
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                                  <Bell className="w-3 h-3" />
+                                  {daysLeft === 0
+                                    ? (lang === "BN" ? "আজই কাটার দিন" : "Today")
+                                    : lang === "BN"
+                                    ? `${daysLeft} দিন বাকি`
+                                    : `${daysLeft}d left`}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </td>
                         <td className="py-4">
                           {batch.officer_verified ? (
                             <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2.5 py-1 rounded-full text-[10px] font-bold border border-sky-100 uppercase font-sans">
@@ -2999,6 +3267,29 @@ export default function App() {
             <p className="text-[11px] text-gray-400">Eliminating transaction asymmetric friction • Powered by Gemini Flash 3.5 AI diagnostics</p>
           </div>
         </footer>
+      )}
+
+      {/* --- GLOBAL FLOATING LOCAL NOTIFICATION TOAST --- */}
+      {showNotificationAlert && (
+        <div
+          id="local-notification-toast"
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 max-w-md bg-[#1A2A1A] text-white px-4 py-3.5 rounded-2xl shadow-xl border border-amber-400/40 flex items-start gap-3 animate-fade-in-up"
+        >
+          <div className="p-1.5 rounded-xl bg-[#F97316] text-white shrink-0 mt-0.5">
+            <Bell className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-bold leading-relaxed flex-1">{notificationAlertMessage}</p>
+          <button
+            type="button"
+            onClick={() => setShowNotificationAlert(false)}
+            className="text-white/60 hover:text-white text-xs font-bold px-1 cursor-pointer"
+            aria-label="Close notification"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {/* --- UNIFIED 4-ROLE LOGIN PORTAL MODAL --- */}

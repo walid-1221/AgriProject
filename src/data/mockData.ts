@@ -4,6 +4,7 @@
  */
 
 import { User, FarmerProfile, CropBatch, OfficerProfile, EscrowContract, AgriTicket, LogisticsPool, DoctorAppointment, CommunityPost } from '../types';
+import { getRelativeDate } from '../utils/harvestNotifications';
 
 export const initialUsers: User[] = [
   // Farmers
@@ -154,7 +155,7 @@ export const initialCropBatches: CropBatch[] = [
     farmer_name: "Abul Hasan Miah",
     upazila_district: "Kaliakair, Gazipur",
     crop_name: "High-Yield Boro Rice (BRRI-89)",
-    estimated_harvest_date: "2026-06-30",
+    estimated_harvest_date: getRelativeDate(3),
     quantity_kg: 3400,
     base_price_per_kg: 36.5,
     officer_verified: true,
@@ -169,7 +170,7 @@ export const initialCropBatches: CropBatch[] = [
     farmer_name: "Abul Hasan Miah",
     upazila_district: "Kaliakair, Gazipur",
     crop_name: "Cardinal Red Potatoes",
-    estimated_harvest_date: "2026-07-15",
+    estimated_harvest_date: getRelativeDate(14),
     quantity_kg: 8500,
     base_price_per_kg: 24.0,
     officer_verified: false,
@@ -184,7 +185,7 @@ export const initialCropBatches: CropBatch[] = [
     farmer_name: "Mofizul Islam",
     upazila_district: "Shibganj, Bogura",
     crop_name: "Premium Tossa Jute (O-9897)",
-    estimated_harvest_date: "2026-07-28",
+    estimated_harvest_date: getRelativeDate(3),
     quantity_kg: 1200,
     base_price_per_kg: 68.0,
     officer_verified: false,
@@ -199,7 +200,7 @@ export const initialCropBatches: CropBatch[] = [
     farmer_name: "Karim Uddin Sheikh",
     upazila_district: "Sreemangal, Moulvibazar",
     crop_name: "Export-Grade Amrapali Mangos (Organic)",
-    estimated_harvest_date: "2026-06-25",
+    estimated_harvest_date: getRelativeDate(3),
     quantity_kg: 1800,
     base_price_per_kg: 135.0,
     officer_verified: true,
@@ -214,7 +215,7 @@ export const initialCropBatches: CropBatch[] = [
     farmer_name: "Karim Uddin Sheikh",
     upazila_district: "Sreemangal, Moulvibazar",
     crop_name: "Hydroponic Greenhouse Bell Peppers",
-    estimated_harvest_date: "2026-07-05",
+    estimated_harvest_date: getRelativeDate(2),
     quantity_kg: 800,
     base_price_per_kg: 190.0,
     officer_verified: true,
