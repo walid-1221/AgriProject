@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion } from 'motion/react';
 import { FarmerProfile, LanguageMode } from '../types';
 import { getTranslation } from '../utils/translations';
 import {
@@ -210,18 +211,31 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             
             {/* 2023 */}
-            {cropHistory.map((item) => (
-              <div key={item.year} className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
+            {cropHistory.map((item, idx) => (
+              <motion.div 
+                key={item.year} 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: idx * 0.08, ease: "easeOut" }}
+                whileHover={{ y: -3, transition: { duration: 0.15 } }}
+                className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2"
+              >
                 <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider">{item.year} Actual</span>
                 <div className="text-lg font-black text-gray-800">{item.yieldPerAcreKg.toLocaleString()} <span className="text-xs text-gray-500 font-normal">kg/acre</span></div>
                 <div className="text-[11px] font-bold text-gray-500 bg-gray-100 py-0.5 px-2 rounded-md truncate" title={item.weatherCondition}>
                   🌤️ {item.weatherCondition}
                 </div>
-              </div>
+              </motion.div>
             ))}
 
             {/* 2026/27 Projected */}
-            <div className="bg-gradient-to-br from-emerald-500 to-[#2D4F1E] text-white p-4 rounded-xl shadow-md space-y-2 relative overflow-hidden">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: cropHistory.length * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              whileHover={{ y: -3, scale: 1.02, transition: { duration: 0.15 } }}
+              className="bg-gradient-to-br from-emerald-500 to-[#2D4F1E] text-white p-4 rounded-xl shadow-md space-y-2 relative overflow-hidden"
+            >
               <div className="absolute top-1 right-1 bg-amber-400 text-gray-900 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase">
                 AI Forecast
               </div>
@@ -230,7 +244,7 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
               <div className="text-[11px] font-bold text-emerald-100 bg-white/20 py-0.5 px-2 rounded-md">
                 {projection.yieldDiffPercent >= 0 ? `+${projection.yieldDiffPercent}%` : `${projection.yieldDiffPercent}%`} {lang === 'BN' ? "গড়ের চেয়ে বেশি" : "vs 3-yr avg"}
               </div>
-            </div>
+            </motion.div>
 
           </div>
 
@@ -411,7 +425,13 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
           {/* Total Projected Harvest */}
-          <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -4, backgroundColor: "rgba(255, 255, 255, 0.16)", transition: { duration: 0.2 } }}
+            className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1 cursor-default transition-colors"
+          >
             <span className="text-xs font-extrabold text-emerald-300 flex items-center gap-1">
               <Sprout className="w-4 h-4" />
               {lang === 'BN' ? "সম্ভাব্য মোট ফলন" : "Estimated Harvest"}
@@ -422,10 +442,16 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
             <p className="text-[11px] text-gray-300 font-medium">
               = {projection.projectedTotalMetricTons} {lang === 'BN' ? "মেট্রিক টন" : "Metric Tons"}
             </p>
-          </div>
+          </motion.div>
 
           {/* Yield Density */}
-          <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -4, backgroundColor: "rgba(255, 255, 255, 0.16)", transition: { duration: 0.2 } }}
+            className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1 cursor-default transition-colors"
+          >
             <span className="text-xs font-extrabold text-emerald-300 flex items-center gap-1">
               <BarChart3 className="w-4 h-4" />
               {lang === 'BN' ? "একর প্রতি গড় ফলন" : "Yield Density"}
@@ -437,10 +463,16 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
               <ArrowUpRight className="w-3.5 h-3.5" />
               {projection.yieldDiffPercent >= 0 ? `+${projection.yieldDiffPercent}%` : `${projection.yieldDiffPercent}%`} vs historical
             </p>
-          </div>
+          </motion.div>
 
           {/* Estimated Gross Market Value */}
-          <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.26, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -4, backgroundColor: "rgba(255, 255, 255, 0.16)", transition: { duration: 0.2 } }}
+            className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1 cursor-default transition-colors"
+          >
             <span className="text-xs font-extrabold text-amber-300 flex items-center gap-1">
               <DollarSign className="w-4 h-4" />
               {lang === 'BN' ? "আনুমানিক বাজার মূল্য" : "Estimated Gross Value"}
@@ -451,10 +483,16 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
             <p className="text-[11px] text-gray-300 font-medium">
               @ ৳{projection.projectedPricePerKg}/kg average
             </p>
-          </div>
+          </motion.div>
 
           {/* Value Band Range */}
-          <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.34, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -4, backgroundColor: "rgba(255, 255, 255, 0.16)", transition: { duration: 0.2 } }}
+            className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 space-y-1 cursor-default transition-colors"
+          >
             <span className="text-xs font-extrabold text-emerald-300 flex items-center gap-1">
               <Award className="w-4 h-4" />
               {lang === 'BN' ? "বাজার ওঠানামা রেঞ্জ" : "Revenue Confidence Band"}
@@ -465,7 +503,7 @@ export const HarvestYieldProjection: React.FC<HarvestYieldProjectionProps> = ({
             <p className="text-[11px] text-gray-300 font-medium pt-1">
               {lang === 'BN' ? "বাজারের চাহিদা ও মান ভেদে ±৮% ব্যবধান" : "±8% volatility band based on grade"}
             </p>
-          </div>
+          </motion.div>
 
         </div>
 

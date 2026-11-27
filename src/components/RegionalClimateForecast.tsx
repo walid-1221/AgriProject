@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { LanguageMode, FarmerProfile } from '../types';
 import {
   CloudSun,
@@ -447,8 +448,12 @@ export const RegionalClimateForecast: React.FC<RegionalClimateForecastProps> = (
                   const isSelected = selectedHarvestDayIndex === idx;
 
                   return (
-                    <div
+                    <motion.div
                       key={idx}
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.35, delay: idx * 0.05, ease: "easeOut" }}
+                      whileHover={{ y: -3, transition: { duration: 0.15 } }}
                       onClick={() => setSelectedHarvestDayIndex(idx)}
                       className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2.5 relative ${
                         isSelected
@@ -496,7 +501,7 @@ export const RegionalClimateForecast: React.FC<RegionalClimateForecastProps> = (
                       <div className={`p-1.5 rounded-xl border text-[10px] font-black text-center ${suitabilityInfo.bg}`}>
                         <div className="truncate">{suitabilityInfo.icon} {suitabilityInfo.text}</div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>

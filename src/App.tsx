@@ -44,7 +44,8 @@ import {
   Sun,
   Moon,
   Leaf,
-  CloudRain
+  CloudRain,
+  BarChart3
 } from "lucide-react";
 import { User, FarmerProfile, CropBatch, OfficerProfile, EscrowContract, AgriTicket, LogisticsPool, DoctorAppointment, LanguageMode, ThemeMode, CommunityPost, StoreOrder } from "./types";
 import { initialUsers, initialFarmerProfiles, initialCropBatches, initialOfficerProfiles, initialEscrowContracts, initialAgriTickets, initialLogisticsPools, initialDoctorAppointments, initialCommunityPosts } from "./data/mockData";
@@ -55,6 +56,9 @@ import { CommunityFeedSection } from "./components/CommunityFeedSection";
 import { AboutUsSection } from "./components/AboutUsSection";
 import { HarvestYieldProjection } from "./components/HarvestYieldProjection";
 import { RegionalClimateForecast } from "./components/RegionalClimateForecast";
+import { BangladeshAgriDataSection } from "./components/BangladeshAgriDataSection";
+import { UnifiedLoginModal } from "./components/UnifiedLoginModal";
+import { OpeningLandingPage } from "./components/OpeningLandingPage";
 import farmerSowingRainImg from "./assets/images/farmer_sowing_rain_1786221231480.jpg";
 
 export default function App() {
@@ -69,7 +73,9 @@ export default function App() {
     return (saved as ThemeMode) || "LIGHT";
   });
 
-  const [activeMainTab, setActiveMainTab] = useState<"DASHBOARD" | "STORE" | "COMMUNITY" | "ABOUT_US">("DASHBOARD");
+  const [activeMainTab, setActiveMainTab] = useState<"HOME" | "AGRI_DATA" | "DASHBOARD" | "STORE" | "COMMUNITY" | "ABOUT_US">("HOME");
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginModalDefaultRole, setLoginModalDefaultRole] = useState<"PRODUCER" | "BUYER" | "OFFICER" | "AGENT">("PRODUCER");
 
   // --- Persistent State ---
   const [users, setUsers] = useState<User[]>(() => {
@@ -1019,511 +1025,304 @@ export default function App() {
     }
   };
 
-  if (!isLoggedIn) {
-    const activeSelectedUserObj = users.find(u => u.user_id === selectedLoginUserId);
-    const activeFeaturedObj = featuredPeople.find(p => p.id === selectedLoginUserId);
+  const handleOpenLoginModal = (role?: string) => {
+    if (role === "BUYER") setLoginModalDefaultRole("BUYER");
+    else if (role === "OFFICER" || role === "DOCTOR" || role === "AGRI_OFFICER") setLoginModalDefaultRole("OFFICER");
+    else if (role === "AGENT") setLoginModalDefaultRole("AGENT");
+    else setLoginModalDefaultRole("PRODUCER");
+    setIsLoginModalOpen(true);
+  };
 
-    return (
-      <div
-        id="login-portal-container"
-        className="min-h-screen text-white flex flex-col justify-between p-6 relative overflow-hidden font-sans selection:bg-[#F97316]/30 bg-cover bg-center bg-no-repeat transition-all duration-500"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(10, 20, 10, 0.75), rgba(10, 20, 10, 0.88)), url(${farmerSowingRainImg})`,
-        }}
-      >
-        
-        {/* Animated ambient background spots */}
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-950/30 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#F97316]/10 rounded-full blur-[120px] pointer-events-none" />
+  const handleModalLoginSuccess = (authenticatedUser: User) => {
+    setActiveUser(authenticatedUser);
+    setIsLoggedIn(true);
+    localStorage.setItem("sf_is_logged_in", "true");
+    localStorage.setItem("sf_active_user", JSON.stringify(authenticatedUser));
+    setActiveMainTab("DASHBOARD");
+    addLog(`Unified 4-Role Terminal: '${authenticatedUser.name}' (${authenticatedUser.role}) authenticated successfully.`);
+    triggerNotificationToast(`✓ Access Granted: Welcome back, ${authenticatedUser.name}!`);
+  };
 
-        {/* Global Toast Alert */}
-        {showNotificationAlert && (
-          <div className="fixed top-5 right-5 z-50 bg-[#2D4F1E] border-2 border-emerald-500/30 text-white px-5 py-4 rounded-2xl shadow-xl flex items-center gap-3 animate-slideIn">
-            <div className="p-1.5 bg-emerald-500/20 rounded-xl text-emerald-400">
-              <Sprout className="w-5 h-5 animate-pulse" />
-            </div>
-            <p className="text-xs font-bold font-sans">{notificationAlertMessage}</p>
-          </div>
-        )}
-
-        {/* HEADER */}
-        <header className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-6 backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-[#F97316] rounded-2xl text-white shadow-md">
-              <Sprout className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-lg font-extrabold tracking-tight uppercase flex items-center gap-2 font-sans text-white">
-                SmartFarmer OS <span className="text-[9px] bg-white/10 text-[#F97316] font-extrabold px-2 py-0.5 rounded-full border border-white/10 uppercase font-mono tracking-wider">v4.2.0</span>
-              </h1>
-              <p className="text-xs text-emerald-200/80 font-medium">Agricultural Market Exchange & Diagnostics Terminal</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-sky-200 bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 shadow-sm">
-            <CloudRain className="w-4 h-4 text-sky-400 animate-bounce" />
-            <span className="font-extrabold">Rainy Season Sowing • Live Climate Portal</span>
-          </div>
-        </header>
-
-        {/* MAIN BODY */}
-        <main className="max-w-6xl mx-auto w-full my-auto py-10 flex flex-col items-center justify-center gap-8">
-          
-          {selectedLoginUserId === null ? (
-            // VIEW 1: DISPLAY 4 PERSONA CARDS
-            <div className="w-full space-y-8 animate-fadeIn">
-              <div className="text-center space-y-3 max-w-2xl mx-auto bg-black/30 backdrop-blur-md p-6 rounded-3xl border border-white/10">
-                <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 px-3.5 py-1 rounded-full text-xs font-extrabold border border-emerald-500/30 mb-1">
-                  <CloudRain className="w-3.5 h-3.5 text-sky-300" />
-                  <span>Monsoon Harvest & Seed Sowing Season</span>
-                </div>
-                <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">E-Governance & Market Exchange Portal</h2>
-                <p className="text-xs sm:text-sm text-gray-200 leading-relaxed font-sans font-medium">
-                  Select one of the 4 key agricultural personnel below to log into your workstation session. Enter their designated passcode to authenticate.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {featuredPeople.map(person => {
-                  const dbUser = users.find(u => u.user_id === person.id) || {
-                    user_id: person.id,
-                    name: person.name,
-                    role: person.role,
-                    upazila_district: person.district,
-                    phone_number: "+8801999888777",
-                    joined_date: "2024-01-10T10:00:00Z"
-                  };
-                  return (
-                    <div
-                      key={person.id}
-                      className="bg-black/40 backdrop-blur-xl border-2 border-white/15 rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between gap-6 hover:bg-black/60 hover:border-emerald-400/50 hover:scale-[1.02] relative group overflow-hidden shadow-2xl"
-                    >
-                      {/* Decorative subtle gradient card glow */}
-                      <div className={`absolute inset-0 bg-gradient-to-br ${person.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
-
-                      <div className="space-y-4 relative z-10">
-                        <div className="flex items-center justify-between">
-                          <span className="text-3xl p-2.5 bg-white/5 rounded-2xl group-hover:scale-110 transition-transform duration-300">{person.avatar}</span>
-                          <span className="text-[9px] font-black tracking-wider uppercase px-2.5 py-1 rounded-full border bg-white/5 text-gray-300 border-white/10 font-sans">
-                            {person.badge}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <h3 className="text-lg font-bold text-white group-hover:text-amber-500 transition-colors duration-200">{person.name}</h3>
-                          <p className="text-xs text-gray-400 flex items-center gap-1 font-sans">
-                            <MapPin className="w-3.5 h-3.5 text-red-500/70" /> {person.district}
-                          </p>
-                        </div>
-
-                        <ul className="space-y-2 border-t border-white/5 pt-4">
-                          {person.skills.map((skill, idx) => (
-                            <li key={idx} className="text-xs text-gray-300 flex items-start gap-2 font-sans font-medium">
-                              <span className="text-emerald-500 shrink-0 mt-0.5 font-sans">✓</span>
-                              <span>{skill}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="space-y-2.5 relative z-10 border-t border-white/5 pt-4">
-                        <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold font-mono px-1">
-                          <span>Passcode Key:</span>
-                          <span className="text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/15">PIN {person.pin}</span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => {
-                              // Fast absolute direct bypass login
-                              handleLoginSubmit(dbUser as User, person.pin);
-                            }}
-                            className="py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors text-center border border-white/5"
-                          >
-                            ⚡ Direct Log In
-                          </button>
-                          <button
-                            onClick={() => handleSelectLoginUser(person.id)}
-                            className="py-2.5 bg-[#2D4F1E] hover:bg-[#3d6b28] text-white font-extrabold text-xs rounded-xl shadow cursor-pointer transition-colors text-center"
-                          >
-                            🔑 Enter PIN
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            // VIEW 2: SECURITY KEYPAD PIN INPUT VIEW
-            <div className="max-w-md w-full bg-white/[0.02] border-2 border-white/5 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-md relative overflow-hidden">
-              
-              {/* Back button */}
-              <button
-                onClick={() => setSelectedLoginUserId(null)}
-                className="text-xs text-gray-400 hover:text-white flex items-center gap-1 font-bold cursor-pointer transition-colors border border-white/5 bg-white/5 px-3 py-1.5 rounded-xl self-start"
-              >
-                ← Back to Personnel List
-              </button>
-
-              <div className="text-center space-y-2">
-                <div className="text-4xl mx-auto py-2">
-                  {activeFeaturedObj?.avatar || "🔑"}
-                </div>
-                <h3 className="text-xl font-extrabold text-white">Workstation Authentication</h3>
-                <p className="text-xs text-gray-400 font-sans">
-                  Confirm access credentials for <strong className="text-white">{activeSelectedUserObj?.name}</strong>
-                </p>
-                <div className="inline-block bg-white/5 px-3 py-1 rounded-full text-[10px] text-gray-400 font-bold border border-white/5 uppercase font-sans">
-                  {activeFeaturedObj?.badge}
-                </div>
-              </div>
-
-              {/* Pin indicator dots */}
-              <div className="space-y-2">
-                <div className="flex justify-center gap-4 py-4">
-                  {[0, 1, 2, 3].map((idx) => {
-                    const isFilled = enteredPin.length > idx;
-                    return (
-                      <div
-                        key={idx}
-                        className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
-                          isFilled
-                            ? "bg-amber-400 border-amber-400 scale-125 shadow-md shadow-amber-400/20"
-                            : "border-gray-600 bg-transparent"
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                
-                {loginError && (
-                  <p className="text-center text-xs text-red-400 font-bold font-sans flex items-center justify-center gap-1.5 bg-red-950/20 p-2.5 rounded-xl border border-red-500/20">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    {loginError}
-                  </p>
-                )}
-              </div>
-
-              {/* Interactive Keypad */}
-              <div className="grid grid-cols-3 gap-3">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => handleKeypadPress(num)}
-                    className="aspect-square flex items-center justify-center text-lg font-bold bg-white/5 hover:bg-white/10 text-white rounded-2xl cursor-pointer active:scale-95 transition-all border border-white/5"
-                  >
-                    {num}
-                  </button>
-                ))}
-                <button
-                  onClick={() => handleKeypadPress("CLEAR")}
-                  className="flex items-center justify-center text-xs font-bold text-red-400 bg-red-950/20 hover:bg-red-900/30 rounded-2xl cursor-pointer active:scale-95 transition-all border border-red-500/10"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={() => handleKeypadPress("0")}
-                  className="aspect-square flex items-center justify-center text-lg font-bold bg-white/5 hover:bg-white/10 text-white rounded-2xl cursor-pointer active:scale-95 transition-all border border-white/5"
-                >
-                  0
-                </button>
-                <button
-                  onClick={() => handleKeypadPress("DELETE")}
-                  className="flex items-center justify-center text-xs font-bold text-gray-300 bg-white/5 hover:bg-white/10 rounded-2xl cursor-pointer active:scale-95 transition-all border border-white/5"
-                >
-                  Delete
-                </button>
-              </div>
-
-              {/* Keytip hint block */}
-              <div className="bg-amber-500/5 border border-amber-500/10 p-3.5 rounded-2xl text-center text-[11px] text-amber-300/80 font-sans">
-                <span className="font-bold font-sans text-amber-400">🔑 System security hint:</span> The designated login PIN for {activeSelectedUserObj?.name.split(" ")[0]} is <strong className="text-amber-400 font-mono font-bold text-xs underline decoration-dotted">{activeFeaturedObj?.pin}</strong>.
-              </div>
-
-              {/* Loader overlay */}
-              {isLoginLoading && (
-                <div className="absolute inset-0 bg-[#0F160F]/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-                  <div className="w-10 h-10 border-4 border-[#F97316] border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-xs text-gray-300 font-bold font-sans">Verifying security signature...</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ALTERNATIVE LOGIN DROP-DOWN PANEL */}
-          <div className="w-full max-w-lg bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-center space-y-3">
-            <button
-              onClick={() => setShowAlternativeUsers(!showAlternativeUsers)}
-              className="text-xs text-gray-400 hover:text-white font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 mx-auto font-sans"
-            >
-              <span>👤 {showAlternativeUsers ? "Hide" : "Show"} alternative system registered personnel</span>
-              <span className="text-[10px] text-gray-500">({users.length - 4} other profiles)</span>
-            </button>
-
-            {showAlternativeUsers && (
-              <div className="pt-3 border-t border-white/5 grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-1">
-                {users.filter(u => !featuredPeople.some(fp => fp.id === u.user_id)).map(altUser => (
-                  <div
-                    key={altUser.user_id}
-                    onClick={() => {
-                      // Login immediately as alternative user
-                      handleLoginSubmit(altUser, "0000");
-                    }}
-                    className="flex items-center justify-between p-2.5 bg-white/5 hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-transparent rounded-xl cursor-pointer transition-all text-left text-xs font-sans group"
-                  >
-                    <div>
-                      <h4 className="font-bold text-white group-hover:text-emerald-400 transition-colors font-sans">{altUser.name}</h4>
-                      <p className="text-[10px] text-gray-400 font-sans">{altUser.upazila_district}</p>
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-wider bg-white/5 px-2.5 py-1 rounded-full border border-white/10 text-gray-400 font-mono">
-                      {altUser.role} (PIN: 0000)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-        </main>
-
-        {/* FOOTER */}
-        <footer className="max-w-7xl mx-auto w-full text-center border-t border-white/5 pt-6 text-[10px] text-gray-500 font-semibold font-mono">
-          SMART FARMER DECENTRALIZED PLATFORM • CO-OPERATIVE SYSTEM FEDERATION
-        </footer>
-
-      </div>
-    );
-  }
+  const handleOpeningPageSelectUser = (user: User) => {
+    setActiveUser(user);
+    setIsLoggedIn(true);
+    localStorage.setItem("sf_is_logged_in", "true");
+    localStorage.setItem("sf_active_user", JSON.stringify(user));
+    setActiveMainTab("DASHBOARD");
+    addLog(`Opening Gateway: Authenticated as '${user.name}' (${user.role}).`);
+    triggerNotificationToast(`✓ Logged in as ${user.name}`);
+  };
 
   return (
-    <div id="smart-farmer-root" className={`min-h-screen font-sans selection:bg-[#2D4F1E]/20 transition-colors duration-300 pb-12 ${
+    <div id="smart-farmer-root" className={`min-h-screen font-sans selection:bg-[#2D4F1E]/20 transition-colors duration-300 ${
+      activeMainTab === "HOME" ? "pb-0" : "pb-12"
+    } ${
       theme === "DARK" ? "bg-[#0F160F] text-gray-100 selection:text-white" :
       theme === "EARTH" ? "bg-[#1A2B19] text-[#E8F0E8] selection:text-[#E8F0E8]" :
       "bg-[#F4F1EA] text-[#1A2A1A] selection:text-[#1A2A1A]"
     }`}>
       
-      {/* --- TOP BANNER / ECOSYSTEM SIMULATOR CONSOLE --- */}
-      <section id="simulator-console" className="sticky top-2 z-45 mx-4 my-2 bg-[#2D4F1E] text-white p-5 rounded-3xl shadow-md border border-white/10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-[#F97316] rounded-2xl text-white shadow-sm flex items-center justify-center">
-              <Sprout className="w-5 h-5 animate-pulse" />
-            </div>
-            <div>
-              <h1 className="text-sm font-bold tracking-tight text-white uppercase flex items-center gap-1.5 font-sans">
-                SmartFarmer OS <span className="text-[10px] bg-white/10 text-[#F97316] font-extrabold px-2 py-0.5 rounded-full border border-white/25 uppercase font-mono tracking-wider">v4.2.0</span>
-              </h1>
-              <p className="text-[11px] text-white/80">{getTranslation(lang, 'tagline')}</p>
-            </div>
-          </div>
-
-          <div id="role-selector-bar" className="flex flex-wrap items-center bg-white/5 p-1.5 rounded-2xl border border-white/10 gap-1 font-sans">
-            <span className="text-[11px] font-bold text-white/60 px-2 uppercase tracking-wide">{getTranslation(lang, 'actingAs')}</span>
+      {/* --- TOP BANNER / ECOSYSTEM SIMULATOR CONSOLE (Only on workspace tabs, hidden on Opening Home page) --- */}
+      {activeMainTab !== "HOME" && (
+        <section id="simulator-console" className="sticky top-2 z-45 mx-4 my-2 bg-[#2D4F1E] text-white p-5 rounded-3xl shadow-md border border-white/10">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
             
-            {/* Farmers */}
-            {users.filter(u => u.role === "FARMER").map(f => (
-              <button
-                key={f.user_id}
-                id={`role-btn-farmer-${f.user_id}`}
-                onClick={() => { setActiveUser(f); setActiveReport(null); setHasScanned(false); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
-                  activeUser.user_id === f.user_id
-                    ? "bg-white text-[#2D4F1E] shadow-sm font-bold"
-                    : "text-white/80 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <span>🌾</span> {f.name.split(" ")[0]}
-              </button>
-            ))}
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-[#F97316] rounded-2xl text-white shadow-sm flex items-center justify-center">
+                <Sprout className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h1 className="text-sm font-bold tracking-tight text-white uppercase flex items-center gap-1.5 font-sans">
+                  SmartFarmer OS <span className="text-[10px] bg-white/10 text-[#F97316] font-extrabold px-2 py-0.5 rounded-full border border-white/25 uppercase font-mono tracking-wider">v4.2.0</span>
+                </h1>
+                <p className="text-[11px] text-white/80">{getTranslation(lang, 'tagline')}</p>
+              </div>
+            </div>
 
-            {/* Buyer */}
-            {users.filter(u => u.role === "BUYER").slice(0, 1).map(b => (
-              <button
-                key={b.user_id}
-                id={`role-btn-buyer-${b.user_id}`}
-                onClick={() => { setActiveUser(b); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
-                  activeUser.user_id === b.user_id
-                    ? "bg-[#F97316] text-white shadow-sm font-bold"
-                    : "text-white/80 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <span>🏢</span> Buyer: Sabbir
-              </button>
-            ))}
+            <div id="role-selector-bar" className="flex flex-wrap items-center bg-white/5 p-1.5 rounded-2xl border border-white/10 gap-1 font-sans">
+              <span className="text-[11px] font-bold text-white/60 px-2 uppercase tracking-wide">{getTranslation(lang, 'actingAs')}</span>
+              
+              {/* Farmers */}
+              {users.filter(u => u.role === "FARMER").map(f => (
+                <button
+                  key={f.user_id}
+                  id={`role-btn-farmer-${f.user_id}`}
+                  onClick={() => { setActiveUser(f); setActiveReport(null); setHasScanned(false); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
+                    activeUser.user_id === f.user_id
+                      ? "bg-white text-[#2D4F1E] shadow-sm font-bold"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <span>🌾</span> {f.name.split(" ")[0]}
+                </button>
+              ))}
 
-            {/* Officer */}
-            {users.filter(u => u.role === "AGRI_OFFICER" || u.role === "DOCTOR").slice(0, 1).map(o => (
-              <button
-                key={o.user_id}
-                id={`role-btn-officer-${o.user_id}`}
-                onClick={() => { setActiveUser(o); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
-                  activeUser.user_id === o.user_id
-                    ? "bg-sky-500 text-white shadow-sm font-bold"
-                    : "text-white/80 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <span>🔬</span> Doctor/Officer: {o.name.split(" ")[0]}
-              </button>
-            ))}
+              {/* Buyer */}
+              {users.filter(u => u.role === "BUYER").slice(0, 1).map(b => (
+                <button
+                  key={b.user_id}
+                  id={`role-btn-buyer-${b.user_id}`}
+                  onClick={() => { setActiveUser(b); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
+                    activeUser.user_id === b.user_id
+                      ? "bg-[#F97316] text-white shadow-sm font-bold"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <span>🏢</span> Buyer: Sabbir
+                </button>
+              ))}
 
-            {/* Agent */}
-            {users.filter(u => u.role === "AGENT" || u.user_id === 401).slice(0, 1).map(a => (
+              {/* Officer */}
+              {users.filter(u => u.role === "AGRI_OFFICER" || u.role === "DOCTOR").slice(0, 1).map(o => (
+                <button
+                  key={o.user_id}
+                  id={`role-btn-officer-${o.user_id}`}
+                  onClick={() => { setActiveUser(o); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
+                    activeUser.user_id === o.user_id
+                      ? "bg-sky-500 text-white shadow-sm font-bold"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <span>🔬</span> Doctor/Officer: {o.name.split(" ")[0]}
+                </button>
+              ))}
+
+              {/* Agent */}
+              {users.filter(u => u.role === "AGENT" || u.user_id === 401).slice(0, 1).map(a => (
+                <button
+                  key={a.user_id}
+                  id={`role-btn-agent-${a.user_id}`}
+                  onClick={() => { setActiveUser(a); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
+                    activeUser.user_id === a.user_id
+                      ? "bg-purple-600 text-white shadow-sm font-bold"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <span>📦</span> Agent: Khorshed
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
-                key={a.user_id}
-                id={`role-btn-agent-${a.user_id}`}
-                onClick={() => { setActiveUser(a); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
-                  activeUser.user_id === a.user_id
-                    ? "bg-purple-600 text-white shadow-sm font-bold"
-                    : "text-white/80 hover:text-white hover:bg-white/10"
-                }`}
+                id="top-unified-login-btn"
+                onClick={() => handleOpenLoginModal()}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gradient-to-r from-amber-500 to-[#F97316] text-white font-extrabold rounded-xl shadow hover:shadow-md hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer border border-amber-300/30"
+                title="Open Unified 4-Role Login Terminal"
               >
-                <span>📦</span> Agent: Khorshed
+                <span>🔑</span>
+                <span>{getTranslation(lang, 'loginBtn')}</span>
               </button>
-            ))}
+
+              <button
+                id="reset-simulation-btn"
+                onClick={handleResetSimulation}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white/10 text-white/90 rounded-xl hover:bg-red-500/20 hover:text-red-200 border border-white/10 font-mono transition-all duration-200 cursor-pointer"
+                title="Wipe LocalStorage and reset profiles"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> {getTranslation(lang, 'resetSim')}
+              </button>
+
+              <button
+                id="logout-btn"
+                onClick={() => {
+                  setIsLoggedIn(false);
+                  localStorage.setItem("sf_is_logged_in", "false");
+                  setEnteredPin("");
+                  setSelectedLoginUserId(null);
+                  setActiveMainTab("HOME");
+                  addLog(`Personnel session terminated. Returning to opening portal.`);
+                  triggerNotificationToast("🔒 Securely logged out.");
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600/10 text-red-200 rounded-xl hover:bg-red-600 hover:text-white border border-red-500/20 font-sans font-bold transition-all duration-200 cursor-pointer"
+                title="Terminate secure session"
+              >
+                <LogOut className="w-3.5 h-3.5" /> {getTranslation(lang, 'signOut')}
+              </button>
+            </div>
+
           </div>
+        </section>
+      )}
 
-          <div className="flex items-center gap-2">
-            <button
-              id="reset-simulation-btn"
-              onClick={handleResetSimulation}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white/10 text-white/90 rounded-xl hover:bg-red-500/20 hover:text-red-200 border border-white/10 font-mono transition-all duration-200 cursor-pointer"
-              title="Wipe LocalStorage and reset profiles"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> {getTranslation(lang, 'resetSim')}
-            </button>
-
-            <button
-              id="logout-btn"
-              onClick={() => {
-                setIsLoggedIn(false);
-                localStorage.setItem("sf_is_logged_in", "false");
-                setEnteredPin("");
-                setSelectedLoginUserId(null);
-                addLog(`Personnel session terminated. Returning to decentralized login portal.`);
-                triggerNotificationToast("🔒 Securely logged out.");
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600/10 text-red-200 rounded-xl hover:bg-red-600 hover:text-white border border-red-500/20 font-sans font-bold transition-all duration-200 cursor-pointer"
-              title="Terminate secure session"
-            >
-              <LogOut className="w-3.5 h-3.5" /> {getTranslation(lang, 'signOut')}
-            </button>
-          </div>
-
-        </div>
-      </section>
-
-      {/* --- PUBLIC NAVIGATION TABS & LANGUAGE / THEME CONTROL BAR --- */}
-      <nav id="main-public-navbar" className="max-w-7xl mx-auto px-4 my-4">
-        <div className="bg-white/90 backdrop-blur-md rounded-3xl p-2.5 shadow-sm border border-[#1A2A1A]/10 flex flex-col md:flex-row items-center justify-between gap-3">
-          
-          {/* Main View Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-            <button
-              onClick={() => setActiveMainTab("DASHBOARD")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
-                activeMainTab === "DASHBOARD"
-                  ? "bg-[#2D4F1E] text-white shadow"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <Sprout className="w-4 h-4" />
-              <span>{getTranslation(lang, 'navDashboard')}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveMainTab("STORE")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
-                activeMainTab === "STORE"
-                  ? "bg-[#2D4F1E] text-white shadow"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <ShoppingBag className="w-4 h-4 text-amber-500" />
-              <span>{getTranslation(lang, 'navStore')}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveMainTab("COMMUNITY")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
-                activeMainTab === "COMMUNITY"
-                  ? "bg-[#2D4F1E] text-white shadow"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 text-sky-500" />
-              <span>{getTranslation(lang, 'navCommunity')}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveMainTab("ABOUT_US")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
-                activeMainTab === "ABOUT_US"
-                  ? "bg-[#2D4F1E] text-white shadow"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <Info className="w-4 h-4 text-emerald-500" />
-              <span>{getTranslation(lang, 'navAbout')}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsLoggedIn(false);
-                setSelectedLoginUserId(null);
-                setEnteredPin("");
-                addLog("Opened Front Display Login Portal.");
-              }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black text-[#1A2A1A] hover:bg-amber-500/20 hover:text-amber-900 border border-amber-500/30 bg-amber-50/80 cursor-pointer transition-all ml-auto md:ml-0"
-              title="Open Front Display Login Page"
-            >
-              <LogOut className="w-4 h-4 text-amber-600" />
-              <span>{lang === "BN" ? "লগইন পোর্টাল" : "Login Portal"}</span>
-            </button>
-          </div>
-
-          {/* Right Side: Language & Theme Switcher */}
-          <div className="flex items-center gap-2 shrink-0">
+      {/* --- PUBLIC NAVIGATION TABS & LANGUAGE / THEME CONTROL BAR (Only on workspace tabs, hidden on Opening Home page) --- */}
+      {activeMainTab !== "HOME" && (
+        <nav id="main-public-navbar" className="max-w-7xl mx-auto px-4 my-4">
+          <div className="bg-white/90 backdrop-blur-md rounded-3xl p-2.5 shadow-sm border border-[#1A2A1A]/10 flex flex-col md:flex-row items-center justify-between gap-3">
             
-            {/* Language Switcher Button */}
-            <button
-              onClick={() => {
-                const nextLang = lang === "EN" ? "BN" : "EN";
-                setLang(nextLang);
-                triggerNotificationToast(nextLang === "BN" ? "🌐 ভাষা পরিবর্তন: বাংলা" : "🌐 Language: English");
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-2xl text-xs font-extrabold cursor-pointer transition-all"
-              title="Toggle Bangla / English Language"
-            >
-              <Globe className="w-4 h-4 text-emerald-700" />
-              <span>{lang === "EN" ? "বাংলা (BN)" : "English (EN)"}</span>
-            </button>
+            {/* Main View Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+              <button
+                id="nav-home-tab"
+                onClick={() => setActiveMainTab("HOME")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "HOME"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <Sprout className="w-4 h-4 text-emerald-400" />
+                <span>{getTranslation(lang, 'navHome')}</span>
+              </button>
 
-            {/* Theme Switcher Button */}
-            <button
-              onClick={() => {
-                const nextTheme = theme === "LIGHT" ? "DARK" : theme === "DARK" ? "EARTH" : "LIGHT";
-                setTheme(nextTheme);
-                triggerNotificationToast(`🎨 Theme changed to ${nextTheme}`);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 rounded-2xl text-xs font-extrabold cursor-pointer transition-all"
-              title="Toggle App Visual Theme"
-            >
-              {theme === "LIGHT" && <Sun className="w-4 h-4 text-amber-500" />}
-              {theme === "DARK" && <Moon className="w-4 h-4 text-indigo-400" />}
-              {theme === "EARTH" && <Leaf className="w-4 h-4 text-emerald-600" />}
-              <span className="capitalize">{theme} Theme</span>
-            </button>
+              <button
+                id="nav-agri-data-tab"
+                onClick={() => setActiveMainTab("AGRI_DATA")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "AGRI_DATA"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <BarChart3 className="w-4 h-4 text-emerald-400" />
+                <span>{getTranslation(lang, 'navAgriData')}</span>
+              </button>
+
+              <button
+                id="nav-dashboard-tab"
+                onClick={() => setActiveMainTab("DASHBOARD")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "DASHBOARD"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <Sprout className="w-4 h-4 text-emerald-500" />
+                <span>{getTranslation(lang, 'navDashboard')}</span>
+              </button>
+
+              <button
+                id="nav-store-tab"
+                onClick={() => setActiveMainTab("STORE")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "STORE"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <ShoppingBag className="w-4 h-4 text-amber-500" />
+                <span>{getTranslation(lang, 'navStore')}</span>
+              </button>
+
+              <button
+                id="nav-community-tab"
+                onClick={() => setActiveMainTab("COMMUNITY")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "COMMUNITY"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 text-sky-500" />
+                <span>{getTranslation(lang, 'navCommunity')}</span>
+              </button>
+
+              <button
+                id="nav-about-tab"
+                onClick={() => setActiveMainTab("ABOUT_US")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all ${
+                  activeMainTab === "ABOUT_US"
+                    ? "bg-[#2D4F1E] text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <Info className="w-4 h-4 text-emerald-500" />
+                <span>{getTranslation(lang, 'navAbout')}</span>
+              </button>
+
+              <button
+                id="nav-top-login-btn"
+                onClick={() => handleOpenLoginModal()}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 shadow-sm cursor-pointer transition-all ml-auto md:ml-0"
+                title="Open 4-Role Login Portal"
+              >
+                <span>🔑</span>
+                <span>{getTranslation(lang, 'loginBtn')}</span>
+              </button>
+            </div>
+
+            {/* Right Side: Language & Theme Switcher */}
+            <div className="flex items-center gap-2 shrink-0">
+              
+              {/* Language Switcher Button */}
+              <button
+                onClick={() => {
+                  const nextLang = lang === "EN" ? "BN" : "EN";
+                  setLang(nextLang);
+                  triggerNotificationToast(nextLang === "BN" ? "🌐 ভাষা পরিবর্তন: বাংলা" : "🌐 Language: English");
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-2xl text-xs font-extrabold cursor-pointer transition-all"
+                title="Toggle Bangla / English Language"
+              >
+                <Globe className="w-4 h-4 text-emerald-700" />
+                <span>{lang === "EN" ? "বাংলা (BN)" : "English (EN)"}</span>
+              </button>
+
+              {/* Theme Switcher Button */}
+              <button
+                onClick={() => {
+                  const nextTheme = theme === "LIGHT" ? "DARK" : theme === "DARK" ? "EARTH" : "LIGHT";
+                  setTheme(nextTheme);
+                  triggerNotificationToast(`🎨 Theme changed to ${nextTheme}`);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 rounded-2xl text-xs font-extrabold cursor-pointer transition-all"
+                title="Toggle App Visual Theme"
+              >
+                {theme === "LIGHT" && <Sun className="w-4 h-4 text-amber-500" />}
+                {theme === "DARK" && <Moon className="w-4 h-4 text-indigo-400" />}
+                {theme === "EARTH" && <Leaf className="w-4 h-4 text-emerald-600" />}
+                <span className="capitalize">{theme} Theme</span>
+              </button>
+
+            </div>
 
           </div>
-
-        </div>
-      </nav>
+        </nav>
+      )}
 
       {/* --- SIMULATED ROLE CONTEXT NOTIFIER --- */}
       {activeMainTab === "DASHBOARD" && (
@@ -1532,14 +1331,44 @@ export default function App() {
             <Info className="w-4 h-4 text-[#2D4F1E] shrink-0" />
             <span>
               You are viewing the dashboard as <strong className="text-white bg-[#2D4F1E] px-2.5 py-0.5 rounded-full font-sans font-semibold text-[11px] uppercase tracking-wide">{activeUser.name}</strong> ({activeUser.role} role).
-              Use the top console bar to switch anytime to test the farmer's leaf AI pathology, place escrow deposits as a Buyer, or certify crop grades as an Agri-Officer.
+              Use the top console bar or Login Portal to switch anytime to test the farmer's leaf AI pathology, place escrow deposits as a Buyer, or certify crop grades as an Agri-Officer.
             </span>
           </p>
         </div>
       )}
 
       {/* --- MAIN PAGE CONTENT WORKSPACE --- */}
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <main className={activeMainTab === "HOME" ? "w-full" : "max-w-7xl mx-auto px-4 py-8 space-y-8"}>
+        
+        {/* VIEW: OPENING PORTAL & BD AGRI NEWS STATEMENTS */}
+        {activeMainTab === "HOME" && (
+          <OpeningLandingPage
+            lang={lang}
+            theme={theme}
+            users={users}
+            onSelectUser={handleOpeningPageSelectUser}
+            onNavigateTab={(tab) => setActiveMainTab(tab)}
+            onOpenLoginModal={handleOpenLoginModal}
+            onToggleLang={() => {
+              const nextLang = lang === "EN" ? "BN" : "EN";
+              setLang(nextLang);
+              triggerNotificationToast(nextLang === "BN" ? "🌐 ভাষা পরিবর্তন: বাংলা" : "🌐 Language: English");
+            }}
+            onToggleTheme={() => {
+              const nextTheme = theme === "LIGHT" ? "DARK" : theme === "DARK" ? "EARTH" : "LIGHT";
+              setTheme(nextTheme);
+              triggerNotificationToast(`🎨 Theme changed to ${nextTheme}`);
+            }}
+          />
+        )}
+
+        {/* VIEW 0: BANGLADESH AGRI DATA DASHBOARD */}
+        {activeMainTab === "AGRI_DATA" && (
+          <BangladeshAgriDataSection
+            lang={lang}
+            onOpenLoginModal={handleOpenLoginModal}
+          />
+        )}
         
         {/* VIEW 1: PUBLIC E-COMMERCE STORE */}
         {activeMainTab === "STORE" && (
@@ -2803,6 +2632,56 @@ export default function App() {
               </div>
             )}
 
+            {/* ========================================================
+                📦 SUB-VIEW: DISTRICT LOGISTICS AGENT WORKSPACE HEADER
+                ======================================================== */}
+            {activeUser.role === "AGENT" && (
+              <div className="space-y-8 animate-fadeIn">
+                <div className="bg-white p-6 md:p-8 rounded-3xl border-2 border-[#1A2A1A]/5 relative overflow-hidden shadow-sm">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl -z-10" />
+                  
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 font-sans">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full">
+                          District Aggregation & Logistics Hub Agent
+                        </span>
+                        <span className="text-[#1A2A1A]/30 text-xs">•</span>
+                        <span className="text-gray-550 text-xs flex items-center gap-1 font-bold">
+                          HUB-ID: BD-LOG-#{activeUser.user_id}
+                        </span>
+                      </div>
+
+                      <h2 className="text-2xl font-bold tracking-tight text-[#1A2A1A]">{activeUser.name}</h2>
+                      <p className="text-xs text-gray-550 leading-relaxed max-w-xl font-medium">
+                        Welcome to your Regional Cargo Aggregation & Transit Terminal. Facilitate collective freight transport, verify smallholder harvest weighment at district gates, and manage cold-chain storage lots across Bangladesh.
+                      </p>
+                    </div>
+
+                    {/* Logistics Agent Metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:w-1/2 bg-[#F4F1EA]/30 border-2 border-[#1A2A1A]/5 rounded-2xl p-4">
+                      <div className="p-1 space-y-1 text-center sm:text-left">
+                        <span className="text-[10px] font-bold text-gray-400 block uppercase">Dispatched</span>
+                        <strong className="text-xl font-extrabold text-[#1A2A1A]">48.5 Tons</strong>
+                      </div>
+                      <div className="p-1 space-y-1 text-center sm:text-left border-l border-gray-200">
+                        <span className="text-[10px] font-bold text-gray-400 block uppercase">Transit Fleet</span>
+                        <strong className="text-xl font-extrabold text-purple-700">6 Trucks</strong>
+                      </div>
+                      <div className="p-1 space-y-1 text-center sm:text-left border-l border-gray-200">
+                        <span className="text-[10px] font-bold text-gray-400 block uppercase">Hub Trust</span>
+                        <strong className="text-xl font-extrabold text-amber-600">★ 4.95</strong>
+                      </div>
+                      <div className="p-1 space-y-1 text-center sm:text-left border-l border-gray-200">
+                        <span className="text-[10px] font-bold text-gray-400 block uppercase">District</span>
+                        <strong className="text-xs font-black text-[#1A2A1A] block truncate uppercase mt-1">{activeUser.upazila_district.split(",").pop()?.trim() || "Bogura"}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* BENTO GRID: PENDING SUPPORT TICKETS & GOV LEADERBOARD */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* CELL 1: SAAO HELPLINE INLET (8 cols) / DOCTOR PATHOLOGY INLET */}
@@ -3112,13 +2991,25 @@ export default function App() {
 
       </main>
 
-      {/* --- FOOTER CARD --- */}
-      <footer className="border-t border-gray-200 bg-white py-12 px-4 text-center text-xs text-gray-400 mt-20 font-sans">
-        <div className="max-w-4xl mx-auto space-y-1 font-semibold">
-          <p className="text-gray-500">© 2026 Smart Farmer Portal • BARC/BRAC Agronomy Verification Systems</p>
-          <p className="text-[11px] text-gray-400">Eliminating transaction asymmetric friction • Powered by Gemini Flash 3.5 AI diagnostics</p>
-        </div>
-      </footer>
+      {/* --- FOOTER CARD (Only on workspace tabs, hidden on Opening Home page) --- */}
+      {activeMainTab !== "HOME" && (
+        <footer className="border-t border-gray-200 bg-white py-12 px-4 text-center text-xs text-gray-400 mt-20 font-sans">
+          <div className="max-w-4xl mx-auto space-y-1 font-semibold">
+            <p className="text-gray-500">© 2026 Smart Farmer Portal • BARC/BRAC Agronomy Verification Systems</p>
+            <p className="text-[11px] text-gray-400">Eliminating transaction asymmetric friction • Powered by Gemini Flash 3.5 AI diagnostics</p>
+          </div>
+        </footer>
+      )}
+
+      {/* --- UNIFIED 4-ROLE LOGIN PORTAL MODAL --- */}
+      <UnifiedLoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleModalLoginSuccess}
+        users={users}
+        lang={lang}
+        defaultRole={loginModalDefaultRole}
+      />
 
     </div>
   );
